@@ -21,6 +21,7 @@ CampusEats is a campus food-ordering platform which allows students to order foo
 - Admin Dashboard
 
 ## Verbs (the actions / tasks / contracts)
+- Manage Profiles
 - Browse Outlets
 - View menu
 - Add item to cart
