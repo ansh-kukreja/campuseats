@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+                xmlns:uni="urn:unipay:payments">
+  <soap:Header>
+    <uni:auth token="CE-MERCHANT-KEY-4471"/>
+  </soap:Header>
+  <soap:Body>
+    <uni:charge>
+      <cardToken>tok_9f2c81a</cardToken>
+      <amount>420.00</amount>
+      <currency>INR</currency>
+      <orderRef>CE-ORD-10245</orderRef>
+    </uni:charge>
+  </soap:Body>
+</soap:Envelope>

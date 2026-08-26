@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+                xmlns:uni="urn:unipay:payments">
+  <soap:Body>
+    <uni:chargeResult>
+      <transactionId>tx_77213</transactionId>
+      <status>captured</status>
+    </uni:chargeResult>
+  </soap:Body>
+</soap:Envelope>
