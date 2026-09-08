@@ -42,9 +42,3 @@ python app.py
 openapi-spec-validator openapi.yaml
 pytest -q
 ```
-
-The service uses an in-process dictionary as permitted by Assignment 4. The outbound payment call is a real HTTP request using `requests`, with a timeout, exponential backoff, jitter, no retry on 4xx, and an `Idempotency-Key` on every payment attempt.
-
-## Important
-
-Do not submit a made-up payment endpoint. Replace `PAYMENTS_URL` with the endpoint exposed by your Tutorial 4 Payments service.

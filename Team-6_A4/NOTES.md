@@ -2,11 +2,11 @@
 
 ## Team
 
-- Gauraansh Gaur — 20251651039
-- Shraiyansh Chaware — 20251651085
-- Utkarsh Singh — 20251651099
-- Abhishek Yadav — 20251651007
-- Jatin Mandwani — 20251651048
+- Gauraansh Gaur - 20251651039
+- Shraiyansh Chaware - 20251651085
+- Utkarsh Singh - 20251651099
+- Abhishek Yadav - 20251651007
+- Jatin Mandwani - 20251651048
 
 ## A4 resource table
 
@@ -17,7 +17,7 @@
 | GET | `/orders?studentId=STU-1001` | Lists orders filtered by student; optional status filter | 200 | 400 |
 | POST | `/orders/{orderId}/cancellation` | Changes an existing order to CANCELLED | 200 | 404, 409, 422 |
 
-## A5 — hard resource decision
+## A5 - hard resource decision
 
 `placeOrder(studentId, items, paymentMethod)` was the least comfortable operation to map because the SOAP name describes a business action rather than a durable noun. I mapped it to `POST /orders` because the operation creates the durable `Order` owned by the Order Service. I rejected `/placeOrder` because the assignment requires verbs such as `place` or `get` to disappear from URLs. I also kept cancellation as the sub-resource `/orders/{orderId}/cancellation` because cancellation represents a state-changing operation attached to one existing order.
 
