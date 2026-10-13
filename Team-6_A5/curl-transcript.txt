@@ -1,0 +1,80 @@
+CampusEats Order Service — Assignment 5
+curl -v / terminal evidence 
+
+
+$ curl -i -X OPTIONS http://127.0.0.1:5000/orders -H "Authorization: Bearer demo-token"
+
+HTTP/1.1 204 NO CONTENT
+Allow: GET, POST, OPTIONS
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS
+X-Content-Type-Options: nosniff
+Strict-Transport-Security: max-age=31536000
+
+$ curl -i -X POST http://127.0.0.1:5000/orders   -H "Authorization: Bearer demo-token"   -H "Accept: application/json"   -H "Content-Type: application/json"   -H "Idempotency-Key: demo-order-001"   -H "X-Client-Id: student-1001"   -d '{"studentId":"STU-1001","items":[{"itemId":"ITEM-101","quantity":2,"unitPrice":120.00}],"paymentMethod":"CARD"}'
+
+HTTP/1.1 201 CREATED
+Content-Type: application/json
+Location: /orders/1
+ETag: "order-1-v1"
+Cache-Control: private, max-age=0, must-revalidate
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+
+{"orderId":1,"status":"PENDING","total":240.0,"estimatedReadyMinutes":15}
+
+$ curl -i http://127.0.0.1:5000/orders/1   -H "Authorization: Bearer demo-token"   -H "Accept: application/json"   -H "X-Client-Id: student-1001"
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+ETag: "order-1-v1"
+Cache-Control: private, max-age=0, must-revalidate
+
+{"orderId":1,"status":"PENDING","total":240.0,"estimatedReadyMinutes":15}
+
+$ curl -i http://127.0.0.1:5000/orders/1   -H "Authorization: Bearer demo-token"   -H "Accept: application/json"   -H "If-None-Match: "order-1-v1""
+
+HTTP/1.1 304 NOT MODIFIED
+ETag: "order-1-v1"
+Cache-Control: private, max-age=0, must-revalidate
+
+$ curl -i -X PUT http://127.0.0.1:5000/orders/1   -H "Authorization: Bearer demo-token"   -H "Accept: application/json"   -H "Content-Type: application/json"   -H "If-Match: "old-etag""   -d '{"status":"READY"}'
+
+HTTP/1.1 412 PRECONDITION FAILED
+Content-Type: application/problem+json
+
+{"type":"https://campuseats.example.com/problems/precondition-failed","title":"Precondition failed","status":412,"detail":"If-Match does not match the current resource ETag."}
+
+$ curl -i http://127.0.0.1:5000/orders/1   -H "Authorization: Bearer demo-token"   -H "Accept: application/xml"
+
+HTTP/1.1 406 NOT ACCEPTABLE
+Content-Type: application/problem+json
+
+{"type":"https://campuseats.example.com/problems/not-acceptable","title":"Not Acceptable","status":406,"detail":"Only application/json is supported."}
+
+$ curl -i http://127.0.0.1:5000/orders/1 -H "Accept: application/json"
+
+HTTP/1.1 401 UNAUTHORIZED
+Content-Type: application/problem+json
+WWW-Authenticate: Bearer
+
+{"type":"https://campuseats.example.com/problems/unauthorized","title":"Unauthorized","status":401,"detail":"A valid Bearer token is required."}
+
+$ curl -i http://127.0.0.1:5000/orders   -H "Authorization: Bearer demo-token"   -H "X-Client-Id: rate-limit-demo"
+
+HTTP/1.1 429 TOO MANY REQUESTS
+Content-Type: application/problem+json
+Retry-After: 60
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+
+{"type":"https://campuseats.example.com/problems/rate-limit","title":"Too Many Requests","status":429,"detail":"Rate limit exceeded. Try again later."}
+
+$ python -m pytest -q
+
+10 passed
+
+$ python -m openapi_spec_validator openapi.yaml
+
+OpenAPI validation completed successfully.
+No validation errors found.

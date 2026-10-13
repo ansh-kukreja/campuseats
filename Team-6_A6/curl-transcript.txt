@@ -1,0 +1,653 @@
+CampusEats Order Service — Assignment 6
+curl -v / terminal evidence 
+
+$body = '{"studentId":"student-1","items":[{"itemId":"item-1","quantity":1,"unitPrice":100}],"paymentMethod":"demo"}'
+[System.IO.File]::WriteAllText("$PWD\body.json", $body, [System.Text.UTF8Encoding]::new($false))
+Get-Content .\body.json
+
+{"studentId":"student-1","items":[{"itemId":"item-1","quantity":1,"unitPrice":100}],"paymentMethod":"demo"}
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders -H "Authorization: Bearer demo-token" -H "Content-Type: application/json" -H "Accept: application/json" -H "Idempotency-Key: a3-fresh-test-001" --data-binary "@body.json"
+
+HTTP/1.1 201 CREATED
+Content-Type: application/json
+Location: /orders/1
+{"estimatedReadyMinutes":15,"orderId":1,"status":"PENDING","total":100.0}
+
+$env:RATE_LIMIT = "2"
+python app.py
+
+curl.exe -i http://127.0.0.1:5000/orders -H "Authorization: Bearer demo-token" -H "Accept: application/json" -H "X-Client-Id: a4-test-client"
+
+HTTP/1.1 429 TOO MANY REQUESTS
+Content-Type: application/problem+json
+Retry-After: 27
+{"detail":"The client has exceeded the rate limit.","status":429,"title":"Too many requests","type":"https://campuseats.example.com/problems/rate-limit"}
+
+$env:RATE_LIMIT = "10"
+$env:PAYMENTS_URL = "http://127.0.0.1:59999/payments"
+python app.py
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders -H "Authorization: Bearer demo-token" -H "Content-Type: application/json" -H "Accept: application/json" -H "Idempotency-Key: a4-503-test-003" --data-binary "@body.json"
+
+HTTP/1.1 503 SERVICE UNAVAILABLE
+Content-Type: application/problem+json
+Content-Length: 165
+Retry-After: 5
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"Payment service is unavailable.","status":503,"title":"Payment service unavailable","type":"https://campuseats.example.com/problems/payment-unavailable"}
+
+curl.exe -i http://127.0.0.1:5000/this-route-does-not-exist -H "Authorization: Bearer demo-token"
+
+HTTP status: 404 NOT FOUND
+Content-Type: application/problem+json
+Content-Length: 144
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"The requested resource does not exist.","status":404,"title":"Not found","type":"https://campuseats.example.com/problems/not-found"}
+
+curl.exe -i http://127.0.0.1:5000/test-server-error -H "Authorization: Bearer demo-token"
+
+HTTP status: 500 INTERNAL SERVER ERROR
+Content-Type: application/problem+json
+Content-Length: 183
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"The request could not be completed due to an internal error.","status":500,"title":"Internal server error","type":"https://campuseats.example.com/problems/internal-error"}
+
+
+$body = '{"studentId":"student-1","items":[],"paymentMethod":"demo"}'
+[System.IO.File]::WriteAllText(
+    "$PWD\body-empty-cart.json",
+    $body,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-empty-cart-001" `
+  --data-binary "@body-empty-cart.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 149
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"The order must contain at least one item.","status":422,"title":"Empty cart","type":"https://campuseats.example.com/problems/empty-cart"}
+
+$body = '{"studentId":"student-1","items":[{"itemId":"item-1","quantity":0,"unitPrice":100}],"paymentMethod":"demo"}'
+[System.IO.File]::WriteAllText(
+    "$PWD\body-invalid-quantity.json",
+    $body,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-invalid-qty-001" `
+  --data-binary "@body-invalid-quantity.json"
+
+HTTP/1.1 400 BAD REQUEST
+Content-Type: application/problem+json
+Content-Length: 155
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"items[0].quantity must be a positive integer.","status":400,"title":"Bad request","type":"https://campuseats.example.com/problems/bad-request"}
+
+curl.exe -i http://127.0.0.1:5000/orders/999999 `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 404 NOT FOUND
+Content-Type: application/problem+json
+Content-Length: 149
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"No order exists with id 999999.","status":404,"title":"Order not found","type":"https://campuseats.example.com/problems/order-not-found"}
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders/1/cancellation `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 409 CONFLICT
+Content-Type: application/problem+json
+Content-Length: 179
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"Order 1 cannot be cancelled from state CANCELLED.","status":409,"title":"Illegal state transition","type":"https://campuseats.example.com/problems/illegal-transition"}
+
+1..12 | ForEach-Object {
+    curl.exe -s -o NUL -w "Request $_ : HTTP %{http_code}`n" `
+      http://127.0.0.1:5000/orders `
+      -H "Authorization: Bearer demo-token" `
+      -H "Accept: application/json"
+}
+
+Request 1 : HTTP 200
+Request 2 : HTTP 200
+Request 3 : HTTP 200
+Request 4 : HTTP 200
+Request 5 : HTTP 200
+Request 6 : HTTP 200
+Request 7 : HTTP 200
+Request 8 : HTTP 200
+Request 9 : HTTP 200
+Request 10 : HTTP 200
+Request 11 : HTTP 429
+Request 12 : HTTP 429
+
+curl.exe -i http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 429 TOO MANY REQUESTS
+Content-Type: application/problem+json
+Content-Length: 154
+Retry-After: 23
+{"detail":"The client has exceeded the rate limit.","status":429,"title":"Too many requests","type":"https://campuseats.example.com/problems/rate-limit"}
+
+$body = '{"studentId":"","items":[{"itemId":"item-1","quantity":0,"unitPrice":100}],"paymentMethod":"demo"}'
+
+[System.IO.File]::WriteAllText(
+    "$PWD\body-b3-test.json",
+    $body,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-b3-test-001" `
+  --data-binary "@body-b3-test.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 310
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"studentId","message":"studentId is required."},{"field":"items[0].quantity","message":"Quantity must be a positive integer."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+$body = '{"studentId":"","address":"Hostel A","items":[{"itemId":"item-1","quantity":0,"unitPrice":100}],"paymentMethod":"demo"}'
+
+[System.IO.File]::WriteAllText("$PWD\body-b3-test1.json", $body, [System.Text.UTF8Encoding]::new($false))
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-b3-test-001" `
+  --data-binary "@body-b3-test1.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 310
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"studentId","message":"studentId is required."},{"field":"items[0].quantity","message":"Quantity must be a positive integer."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+$body = '{"studentId":"student-1","items":[{"itemId":"item-1","quantity":1,"unitPrice":100}],"paymentMethod":"demo"}'
+
+[System.IO.File]::WriteAllText("$PWD\body-b3-test2.json", $body, [System.Text.UTF8Encoding]::new($false))
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-b3-test-002" `
+  --data-binary "@body-b3-test2.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 227
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"address","message":"address is required."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+$body = '{"studentId":"student-1","items":[{"itemId":"item-1","quantity":0,"unitPrice":100}],"paymentMethod":"demo"}'
+
+[System.IO.File]::WriteAllText("$PWD\body-b3-test3.json", $body, [System.Text.UTF8Encoding]::new($false))
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-b3-test-003" `
+  --data-binary "@body-b3-test3.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 306
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"address","message":"address is required."},{"field":"items[0].quantity","message":"Quantity must be a positive integer."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+$body = '{"studentId":"student-1","address":"Hostel A","items":[],"paymentMethod":"demo"}'
+
+[System.IO.File]::WriteAllText("$PWD\body-b3-test4.json", $body, [System.Text.UTF8Encoding]::new($false))
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: a6-b3-test-004" `
+  --data-binary "@body-b3-test4.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 240
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"items","message":"The order must contain at least one item."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/empty-cart"}
+
+curl.exe -i -H "Authorization: Bearer demo-token" http://127.0.0.1:5000/__test_internal_error
+
+HTTP/1.1 500 INTERNAL SERVER ERROR
+Content-Type: application/problem+json
+Content-Length: 183
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"The request could not be completed due to an internal error.","status":500,"title":"Internal server error","type":"https://campuseats.example.com/problems/internal-error"}
+
+$body = @{
+  studentId = "S101"
+  address = "Hostel"
+  items = @()
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+  "$PWD\c1-test.json",
+  $body,
+  [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Idempotency-Key: c1-empty-test-4" `
+  --data-binary "@$PWD\c1-test.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 305
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"items","message":"The order must contain at least one item."},{"field":"paymentMethod","message":"paymentMethod is required."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/empty-cart"}
+
+$body = @{
+  studentId = "S101"
+  address = "Hostel"
+  items = @(
+    @{
+      itemId = "ITEM1"
+      quantity = 0
+      unitPrice = 50
+    }
+  )
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+  "$PWD\c1-quantity-test.json",
+  $body,
+  [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Idempotency-Key: c1-quantity-test-1" `
+  --data-binary "@$PWD\c1-quantity-test.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 318
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"items[0].quantity","message":"Quantity must be a positive integer."},{"field":"paymentMethod","message":"paymentMethod is required."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+$body = @{
+  studentId = "S101"
+  items = @(
+    @{
+      itemId = "ITEM1"
+      quantity = 1
+      unitPrice = 50
+    }
+  )
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+  "$PWD\c1-address-test.json",
+  $body,
+  [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Idempotency-Key: c1-address-test-1" `
+  --data-binary "@$PWD\c1-address-test.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 292
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"address","message":"address is required."},{"field":"paymentMethod","message":"paymentMethod is required."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+$body = @{
+  studentId = ""
+  address = ""
+  items = @(
+    @{
+      itemId = "ITEM1"
+      quantity = 0
+      unitPrice = 50
+    }
+  )
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+  "$PWD\c2-multiple-errors.json",
+  $body,
+  [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Idempotency-Key: c2-multiple-errors-1" `
+  --data-binary "@$PWD\c2-multiple-errors.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json
+Content-Length: 428
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"studentId","message":"studentId is required."},{"field":"address","message":"address is required."},{"field":"items[0].quantity","message":"Quantity must be a positive integer."},{"field":"paymentMethod","message":"paymentMethod is required."}],"status":422,"title":"Validation failed","type":"[https://campuseats.example.com/problems/validation-error](https://campuseats.example.com/problems/validation-error)"}
+
+curl.exe -i http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/xml"
+
+HTTP/1.1 200 OK
+Content-Type: application/xml; charset=utf-8
+Content-Length: 21
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 7
+<response></response>
+
+curl.exe -i http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: 3
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 7
+[]
+
+curl.exe -i http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: text/csv"
+
+HTTP/1.1 406 NOT ACCEPTABLE
+Content-Type: application/problem+json
+Content-Length: 190
+{"detail":"This service only supports application/json and application/xml responses.","status":406,"title":"Not acceptable","type":"https://campuseats.example.com/problems/not-acceptable"}
+
+curl.exe -i http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 200 OK
+
+Content-Type: application/json; charset=utf-8
+Content-Length: 3
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+[]
+
+curl.exe -i http://127.0.0.1:5000/orders/999999 `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 404 NOT FOUND
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 149
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"No order exists with id 999999.","status":404,"title":"Order not found","type":"https://campuseats.example.com/problems/order-not-found"}
+
+$body = '{"studentId":"student-1","address":"IIIT Vadodara, Gandhinagar","items":[{"itemId":"item-1","quantity":1,"unitPrice":100}],"paymentMethod":"demo"}'
+[System.IO.File]::WriteAllText("$PWD\body.json", $body, [System.Text.UTF8Encoding]::new($false))
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: d1-final-success-001" `
+  --data-binary "@body.json"
+
+HTTP/1.1 201 CREATED
+Content-Type: application/json; charset=utf-8
+Content-Length: 74
+ETag: "46358bb0f5e92c87"
+Location: /orders/1
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"estimatedReadyMinutes":15,"orderId":1,"status":"PENDING","total":100.0}
+
+
+$body = @{
+    studentId = "D2-EMPTY"
+    address = "IIIT Vadodara, Gandhinagar"
+    items = @()
+    paymentMethod = "CARD"
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+    "$PWD\d2-empty.json", $body,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Idempotency-Key: d2-empty-$(Get-Date -Format 'HHmmss')" `
+  --data-binary "@$PWD\d2-empty.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 240
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"items","message":"The order must contain at least one item."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/empty-cart"}
+
+$body = @{
+    studentId = "D2-QUANTITY"
+    address = "IIIT Vadodara, Gandhinagar"
+    items = @(
+        @{
+            itemId = "ITEM-101"
+            quantity = 0
+            unitPrice = 50
+        }
+    )
+    paymentMethod = "CARD"
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+    "$PWD\d2-invalid-quantity.json",
+    $body,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Idempotency-Key: d2-quantity-$(Get-Date -Format 'HHmmss')" `
+  --data-binary "@$PWD\d2-invalid-quantity.json"
+
+HTTP/1.1 422 UNPROCESSABLE ENTITY
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 253
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"detail":"One or more fields contain invalid values.","errors":[{"field":"items[0].quantity","message":"Quantity must be a positive integer."}],"status":422,"title":"Validation failed","type":"https://campuseats.example.com/problems/validation-error"}
+
+curl.exe -i http://127.0.0.1:5000/orders/999999 `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/json"
+
+HTTP/1.1 404 NOT FOUND
+Server: Werkzeug/3.1.9 Python/3.14.3
+Date: Mon, 12 Oct 2026 12:54:53 GMT
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 149
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"detail":"No order exists with id 999999.","status":404,"title":"Order not found","type":"https://campuseats.example.com/problems/order-not-found"}
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders/1/cancellation `
+  -H "Authorization: Bearer demo-token"
+
+HTTP/1.1 409 CONFLICT
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 179
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 5
+{"detail":"Order 1 cannot be cancelled from state CANCELLED.","status":409,"title":"Illegal state transition","type":"https://campuseats.example.com/problems/illegal-transition"}
+
+1..3 | ForEach-Object {
+    curl.exe -i http://127.0.0.1:5000/orders `
+      -H "Authorization: Bearer demo-token" `
+      -H "Accept: application/json" `
+      -H "X-Client-Id: d2-rate-limit-test"
+    ""
+}
+
+HTTP/1.1 429 TOO MANY REQUESTS
+Content-Type: application/problem+json; charset=utf-8
+Content-Length: 154
+Retry-After: 59
+{"detail":"The client has exceeded the rate limit.","status":429,"title":"Too many requests","type":"https://campuseats.example.com/problems/rate-limit"}
+
+curl.exe -i http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Accept: application/xml"
+
+HTTP/1.1 200 OK
+Content-Type: application/xml; charset=utf-8
+Content-Length: 21
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+<response></response>
+
+$body = @{
+    studentId = "D4-IDEMPOTENCY"
+    address = "IIIT Vadodara, Gandhinagar"
+    items = @(
+        @{
+            itemId = "ITEM-101"
+            quantity = 1
+            unitPrice = 50
+        }
+    )
+    paymentMethod = "CARD"
+} | ConvertTo-Json -Depth 5 -Compress
+
+[System.IO.File]::WriteAllText(
+    "$PWD\d4-idempotency.json",
+    $body,
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+$key = "d4-idempotency-final-001"
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: $key" `
+  --data-binary "@$PWD\d4-idempotency.json"
+
+HTTP/1.1 201 CREATED
+Content-Type: application/json; charset=utf-8
+Content-Length: 73
+ETag: "65fc46221db11734"
+Cache-Control: private, max-age=60
+Location: /orders/1
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"estimatedReadyMinutes":15,"orderId":1,"status":"PENDING","total":50.0}
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: d4-idempotency-final-001" `
+  --data-binary "@$PWD\d4-idempotency.json"
+
+HTTP/1.1 201 CREATED
+Content-Type: application/json; charset=utf-8
+Content-Length: 73
+ETag: "65fc46221db11734"
+Cache-Control: private, max-age=60
+Location: /orders/1
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"estimatedReadyMinutes":15,"orderId":1,"status":"PENDING","total":50.0}
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: d4-idempotency-final-001" `
+  --data-binary "@$PWD\d4-idempotency.json"
+
+HTTP/1.1 201 CREATED
+
+Content-Type: application/json; charset=utf-8
+Content-Length: 73
+ETag: "65fc46221db11734"
+Cache-Control: private, max-age=60
+Location: /orders/1
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 9
+{"estimatedReadyMinutes":15,"orderId":1,"status":"PENDING","total":50.0}
+
+curl.exe -i -X POST http://127.0.0.1:5000/orders `
+  -H "Authorization: Bearer demo-token" `
+  -H "Content-Type: application/json" `
+  -H "Accept: application/json" `
+  -H "Idempotency-Key: d4-idempotency-final-001" `
+  --data-binary "@$PWD\d4-idempotency.json"
+
+HTTP/1.1 201 CREATED
+Content-Type: application/json; charset=utf-8
+Content-Length: 73
+ETag: "65fc46221db11734"
+Cache-Control: private, max-age=60
+Location: /orders/1
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 8
+{"estimatedReadyMinutes":15,"orderId":1,"status":"PENDING","total":50.0}
+
+HTTP status: 503
+Content-Type: application/problem+json; charset=utf-8
+Retry-After: 5
+Response body: {
+  "detail": "Payment service timed out.",
+  "status": 503,
+  "title": "Payment service unavailable",
+  "type": "https://campuseats.example.com/problems/payment-unavailable"
+}
+D4.3 timeout handling: PASS
+
