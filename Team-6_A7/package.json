@@ -1,0 +1,15 @@
+{
+  "name": "campuseats-orders",
+  "version": "1.0.0",
+  "description": "CampusEats Orders service exposed through GraphQL (Node + Apollo + MySQL)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@apollo/server": "^4.11.0",
+    "graphql": "^16.9.0",
+    "mysql2": "^3.11.0"
+  }
+}

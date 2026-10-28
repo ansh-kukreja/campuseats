@@ -1,0 +1,28 @@
+# schema.graphql -- CampusEats "Orders" service
+
+type Order {
+  id: ID!
+  customer: String!
+  item: String!
+  quantity: Int!
+  total: Float!
+  status: String!
+  note: String
+}
+
+input AddOrderInput {
+  customer: String!
+  item: String!
+  quantity: Int = 1
+  total: Float!
+  note: String
+}
+
+type Query {
+  orders: [Order!]!
+  order(id: ID!): Order
+}
+
+type Mutation {
+  addOrder(input: AddOrderInput!): Order!
+}
