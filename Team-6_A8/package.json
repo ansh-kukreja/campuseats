@@ -1,0 +1,13 @@
+{
+  "name": "campuseats-orders-api",
+  "version": "1.0.0",
+  "description": "CS543 Assignment 8 - CampusEats Orders service as a REST API (Node + Express)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "ISC"
+}
